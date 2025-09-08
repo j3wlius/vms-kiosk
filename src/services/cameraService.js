@@ -311,21 +311,49 @@ class CameraService {
         throw new Error('Camera not active');
       }
 
+      // Check if video is ready
+      if (this.videoElement.readyState < 2) {
+        throw new Error('Video not ready for capture');
+      }
+
+      // Check video dimensions
+      if (!this.videoElement.videoWidth || !this.videoElement.videoHeight) {
+        throw new Error('Video dimensions not available');
+      }
+
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
+
+      if (!context) {
+        throw new Error('Could not get canvas context');
+      }
 
       // Set canvas dimensions
       canvas.width = this.videoElement.videoWidth;
       canvas.height = this.videoElement.videoHeight;
 
+      console.log('Capturing image with dimensions:', canvas.width, 'x', canvas.height);
+
       // Draw video frame to canvas
       context.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height);
 
-      // Convert to blob
-      const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/jpeg', this.settings.quality);
+      // Convert to blob with timeout and error handling
+      const blob = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Canvas toBlob timeout'));
+        }, 5000);
+
+        canvas.toBlob((blob) => {
+          clearTimeout(timeout);
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Canvas toBlob returned null'));
+          }
+        }, 'image/jpeg', this.settings.quality || 0.8);
       });
 
+      console.log('Successfully captured image blob:', blob.size, 'bytes');
       return blob;
     } catch (error) {
       this.handleError('Failed to capture image', error);

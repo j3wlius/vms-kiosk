@@ -58,7 +58,7 @@ export const useAutoScan = () => {
   // Settings
   const settings = {
     scanCooldown: 2000, // Minimum time between scans (ms)
-    qualityThreshold: 0.7, // Minimum quality for auto-scan
+    qualityThreshold: 0.5, // Minimum quality for auto-scan (more lenient)
     maxScanAttempts: 3, // Maximum consecutive scan attempts
     analysisInterval: 100, // Frame analysis interval (ms)
     autoEntryTimeout: 60000, // Auto-entry timeout (60 seconds)
@@ -255,8 +255,8 @@ export const useAutoScan = () => {
       position: analysis.position,
     }));
 
-    // Check if we should trigger auto-scan
-    if (analysis.hasDocument && analysis.isPositioned && analysis.quality >= settings.qualityThreshold) {
+    // Check if we should trigger auto-scan (more lenient conditions)
+    if (analysis.hasDocument && analysis.quality >= settings.qualityThreshold) {
       if (canTriggerScan()) {
         // Add a small delay to ensure stable positioning
         analysisTimeoutRef.current = setTimeout(() => {
@@ -307,7 +307,7 @@ export const useAutoScan = () => {
 
       const ocrResults = await ocrService.processImage(imageBlob);
 
-      if (ocrResults && ocrResults.confidence > 0.7) {
+      if (ocrResults && ocrResults.confidence > 0.5) {
         // Successful scan
         setResults(ocrResults);
         setConfidence(ocrResults.confidence);

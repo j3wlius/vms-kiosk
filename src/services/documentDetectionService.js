@@ -17,12 +17,12 @@ class DocumentDetectionService {
     // Detection settings
     this.settings = {
       analysisInterval: 100, // ms between frame analysis
-      minDocumentSize: 0.3, // minimum document size as fraction of frame
-      maxDocumentSize: 0.9, // maximum document size as fraction of frame
-      minContrast: 0.3, // minimum contrast for document detection
-      minSharpness: 0.5, // minimum sharpness threshold
-      positionTolerance: 0.1, // tolerance for centered positioning
-      qualityThreshold: 0.7, // minimum quality for auto-scan
+      minDocumentSize: 0.15, // minimum document size as fraction of frame (more lenient)
+      maxDocumentSize: 0.95, // maximum document size as fraction of frame
+      minContrast: 0.15, // minimum contrast for document detection (more lenient)
+      minSharpness: 0.3, // minimum sharpness threshold (more lenient)
+      positionTolerance: 0.2, // tolerance for centered positioning (more lenient)
+      qualityThreshold: 0.5, // minimum quality for auto-scan (more lenient)
     };
     
     // Analysis state
@@ -279,20 +279,49 @@ class DocumentDetectionService {
    * @returns {object|null} Document bounds or null
    */
   detectDocumentBounds(grayscale, width, height) {
-    // Simplified document detection using edge detection
-    // In a production app, you'd use more sophisticated algorithms like Hough transforms
-    
+    // More practical approach: use edge density and contrast analysis
     const edges = this.detectEdges(grayscale, width, height);
     const contours = this.findContours(edges, width, height);
     
-    // Find the largest rectangular contour
+    if (contours.length === 0) {
+      // Fallback: assume there's a document in the center portion of the frame
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const docWidth = Math.min(width * 0.7, 350);
+      const docHeight = Math.min(height * 0.5, 220);
+      
+      // Check if the center region has reasonable contrast
+      const centerContrast = this.analyzeRegionContrast(grayscale, width, height, 
+        centerX - docWidth/2, centerY - docHeight/2, docWidth, docHeight);
+      
+      if (centerContrast > 0.2) {
+        return {
+          x: centerX - docWidth/2,
+          y: centerY - docHeight/2,
+          width: docWidth,
+          height: docHeight
+        };
+      }
+      return null;
+    }
+    
+    // Find the best contour based on size and position
     let bestContour = null;
-    let maxArea = 0;
+    let bestScore = 0;
     
     for (const contour of contours) {
-      const area = this.calculateContourArea(contour);
-      if (area > maxArea && this.isRectangularContour(contour)) {
-        maxArea = area;
+      const bounds = this.getBoundingBox(contour);
+      const area = bounds.width * bounds.height;
+      const centerDistance = Math.abs(bounds.x + bounds.width/2 - width/2) + 
+                           Math.abs(bounds.y + bounds.height/2 - height/2);
+      
+      // Score based on size and center position
+      const sizeScore = Math.min(area / (width * height * 0.3), 1);
+      const positionScore = Math.max(0, 1 - centerDistance / (width + height));
+      const score = sizeScore * 0.7 + positionScore * 0.3;
+      
+      if (score > bestScore && this.isValidDocumentSize(bounds, width, height, this.settings)) {
+        bestScore = score;
         bestContour = contour;
       }
     }
@@ -355,21 +384,43 @@ class DocumentDetectionService {
    * @returns {Array} Array of contours
    */
   findContours(edges, width, height) {
-    // Simplified contour finding
-    // In production, use proper contour detection algorithms
-    const threshold = 50;
+    // More practical approach: look for rectangular regions with high edge density
+    const threshold = 30;
     const contours = [];
+    const blockSize = 40;
     
-    for (let y = 0; y < height; y += 10) {
-      for (let x = 0; x < width; x += 10) {
-        const idx = y * width + x;
-        if (edges[idx] > threshold) {
-          // Simple rectangular contour approximation
+    // Grid-based analysis to find document-like regions
+    for (let y = blockSize; y < height - blockSize; y += blockSize / 2) {
+      for (let x = blockSize; x < width - blockSize; x += blockSize / 2) {
+        let edgeCount = 0;
+        let totalPixels = 0;
+        
+        // Check the edge density in this block
+        for (let dy = -blockSize/2; dy < blockSize/2; dy += 2) {
+          for (let dx = -blockSize/2; dx < blockSize/2; dx += 2) {
+            const idx = (y + dy) * width + (x + dx);
+            if (idx >= 0 && idx < edges.length) {
+              totalPixels++;
+              if (edges[idx] > threshold) {
+                edgeCount++;
+              }
+            }
+          }
+        }
+        
+        const edgeDensity = edgeCount / totalPixels;
+        
+        // If we find a region with good edge density, create a document-sized contour
+        if (edgeDensity > 0.15 && edgeDensity < 0.8) {
+          // Create a document-sized rectangle around this region
+          const docWidth = Math.min(width * 0.6, 300);
+          const docHeight = Math.min(height * 0.4, 200);
+          
           contours.push([
-            { x: x - 50, y: y - 30 },
-            { x: x + 50, y: y - 30 },
-            { x: x + 50, y: y + 30 },
-            { x: x - 50, y: y + 30 },
+            { x: x - docWidth/2, y: y - docHeight/2 },
+            { x: x + docWidth/2, y: y - docHeight/2 },
+            { x: x + docWidth/2, y: y + docHeight/2 },
+            { x: x - docWidth/2, y: y + docHeight/2 },
           ]);
         }
       }
@@ -393,6 +444,48 @@ class DocumentDetectionService {
       area -= contour[j].x * contour[i].y;
     }
     return Math.abs(area) / 2;
+  }
+
+  /**
+   * Analyze contrast in a specific region
+   * @param {Uint8ClampedArray} grayscale - Grayscale image data
+   * @param {number} width - Image width
+   * @param {number} height - Image height
+   * @param {number} x - Region X position
+   * @param {number} y - Region Y position
+   * @param {number} regionWidth - Region width
+   * @param {number} regionHeight - Region height
+   * @returns {number} Contrast value (0-1)
+   */
+  analyzeRegionContrast(grayscale, width, height, x, y, regionWidth, regionHeight) {
+    let sum = 0;
+    let sumSquares = 0;
+    let count = 0;
+    
+    const startX = Math.max(0, Math.floor(x));
+    const endX = Math.min(width, Math.floor(x + regionWidth));
+    const startY = Math.max(0, Math.floor(y));
+    const endY = Math.min(height, Math.floor(y + regionHeight));
+    
+    for (let py = startY; py < endY; py += 2) {
+      for (let px = startX; px < endX; px += 2) {
+        const idx = py * width + px;
+        if (idx < grayscale.length) {
+          const value = grayscale[idx];
+          sum += value;
+          sumSquares += value * value;
+          count++;
+        }
+      }
+    }
+    
+    if (count === 0) return 0;
+    
+    const mean = sum / count;
+    const variance = (sumSquares / count) - (mean * mean);
+    const stdDev = Math.sqrt(variance);
+    
+    return Math.min(stdDev / 128, 1);
   }
 
   /**
