@@ -15,6 +15,12 @@ const useIdleDetection = (idleTime = 30000) => {
   // Reset idle state when scanning becomes active
   useEffect(() => {
     if (scanningActivity.isScanning || scanningActivity.isAutoScanning || scanningActivity.isProcessing) {
+      console.log('Idle detection: Scanning activity detected, preventing idle screen', {
+        isScanning: scanningActivity.isScanning,
+        isAutoScanning: scanningActivity.isAutoScanning,
+        isProcessing: scanningActivity.isProcessing,
+        lastActivity: scanningActivity.lastActivity
+      });
       setIsIdle(false);
     }
   }, [scanningActivity.isScanning, scanningActivity.isAutoScanning, scanningActivity.isProcessing]);
@@ -29,8 +35,35 @@ const useIdleDetection = (idleTime = 30000) => {
     const startIdleTimer = () => {
       idleTimer = setTimeout(() => {
         // Don't set idle if scanning is active
+        console.log('Idle detection: Timer fired, checking scanning activity', {
+          scanningActivity: {
+            isScanning: scanningActivity.isScanning,
+            isAutoScanning: scanningActivity.isAutoScanning,
+            isProcessing: scanningActivity.isProcessing,
+            lastActivity: scanningActivity.lastActivity
+          }
+        });
+        
         if (!scanningActivity.isScanning && !scanningActivity.isAutoScanning && !scanningActivity.isProcessing) {
+          console.log('Idle detection: Setting idle state after timeout', {
+            idleTime,
+            scanningActivity: {
+              isScanning: scanningActivity.isScanning,
+              isAutoScanning: scanningActivity.isAutoScanning,
+              isProcessing: scanningActivity.isProcessing
+            }
+          });
           setIsIdle(true);
+        } else {
+          console.log('Idle detection: Preventing idle due to active scanning', {
+            scanningActivity: {
+              isScanning: scanningActivity.isScanning,
+              isAutoScanning: scanningActivity.isAutoScanning,
+              isProcessing: scanningActivity.isProcessing
+            }
+          });
+          // Restart the timer if scanning is still active
+          startIdleTimer();
         }
       }, idleTime);
     };

@@ -15,6 +15,7 @@ import {
 import {
   // cameraStatusAtom,
   cameraErrorAtom,
+  scanningActivityAtom,
 } from '../../stores/atoms/systemAtoms';
 
 const CheckInScreen = () => {
@@ -32,6 +33,7 @@ const CheckInScreen = () => {
   // Atom setters
   const setFormData = useSetAtom(formDataAtom);
   const setOcrProcessing = useSetAtom(ocrProcessingAtom);
+  const setScanningActivity = useSetAtom(scanningActivityAtom);
   // const setCameraError = useSetAtom(cameraErrorAtom);
 
   // Camera hooks
@@ -61,16 +63,37 @@ const CheckInScreen = () => {
   useEffect(() => {
     const initializeCamera = async () => {
       try {
-        await initCamera();
-        setIsInitialized(true);
+        console.log('CheckInScreen: Starting camera initialization...');
+        
+        // Set scanning activity to prevent idle screen during initialization
+        setScanningActivity(prev => ({
+          ...prev,
+          isScanning: true,
+          lastActivity: Date.now(),
+        }));
+        
+        const success = await initCamera();
+        console.log('CheckInScreen: Camera initialization result:', success);
+        
+        if (success) {
+          setIsInitialized(true);
+          console.log('CheckInScreen: Camera initialized successfully');
+        } else {
+          throw new Error('Camera initialization returned false');
+        }
       } catch (error) {
-        console.error('Camera initialization failed:', error);
+        console.error('CheckInScreen: Camera initialization failed:', error);
+        // Clear scanning activity on error
+        setScanningActivity(prev => ({
+          ...prev,
+          isScanning: false,
+        }));
         // setCameraError(error.message);
       }
     };
 
     initializeCamera();
-  }, [initCamera]);
+  }, [initCamera, setScanningActivity]);
 
   // Handle camera permissions
   const handleRequestPermissions = async () => {
@@ -212,6 +235,18 @@ const CheckInScreen = () => {
       }
     };
   }, [showCountdown, timeRemaining]);
+
+  // Cleanup scanning activity on unmount
+  useEffect(() => {
+    return () => {
+      setScanningActivity(prev => ({
+        ...prev,
+        isScanning: false,
+        isAutoScanning: false,
+        isProcessing: false,
+      }));
+    };
+  }, [setScanningActivity]);
 
   // Show loading state
   if (!isInitialized) {

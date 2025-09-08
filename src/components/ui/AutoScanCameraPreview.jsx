@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCamera } from '../../hooks/useCamera';
 import { useAutoScan } from '../../hooks/useAutoScan';
-import { cameraStatusAtom, cameraSettingsAtom } from '../../stores/atoms/systemAtoms';
+import { cameraStatusAtom, cameraSettingsAtom, scanningActivityAtom } from '../../stores/atoms/systemAtoms';
 import Button from './Button';
 import LoadingSpinner from './LoadingSpinner';
 import Card from './Card';
@@ -20,6 +20,7 @@ const AutoScanCameraPreview = ({
 }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const autoScanStartedRef = useRef(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -55,25 +56,57 @@ const AutoScanCameraPreview = ({
   // Atom values
   const cameraStatus = useAtomValue(cameraStatusAtom);
   const cameraSettings = useAtomValue(cameraSettingsAtom);
+  const setScanningActivity = useSetAtom(scanningActivityAtom);
 
   // Initialize camera and auto-scan on mount
   useEffect(() => {
+    console.log('AutoScanCameraPreview: Mount effect triggered', {
+      autoStart,
+      isInitialized,
+      isInitializing
+    });
+    
     if (autoStart && !isInitialized && !isInitializing) {
+      console.log('AutoScanCameraPreview: Starting camera initialization...');
       handleInitialize();
     }
   }, [autoStart, isInitialized, isInitializing]);
 
   // Initialize auto-scan when camera is ready
   useEffect(() => {
+    console.log('AutoScanCameraPreview: Auto-scan initialization effect', {
+      isInitialized,
+      isAutoScanning
+    });
+    
     if (isInitialized && !isAutoScanning) {
+      console.log('AutoScanCameraPreview: Initializing auto-scan...');
       initAutoScan();
     }
   }, [isInitialized, initAutoScan, isAutoScanning]);
 
   // Start auto-scan when video is loaded
   useEffect(() => {
-    if (videoLoaded && isActive && videoRef.current && !isAutoScanning) {
+    console.log('AutoScanCameraPreview: Video loaded effect', {
+      videoLoaded,
+      isActive,
+      hasVideoRef: !!videoRef.current,
+      isAutoScanning,
+      autoScanStarted: autoScanStartedRef.current
+    });
+    
+    if (videoLoaded && isActive && videoRef.current && !isAutoScanning && !autoScanStartedRef.current) {
+      console.log('AutoScanCameraPreview: Starting auto-scan...');
+      autoScanStartedRef.current = true;
       startAutoScan(videoRef.current, onTimeout);
+    } else {
+      console.log('AutoScanCameraPreview: Not starting auto-scan, conditions not met:', {
+        videoLoaded,
+        isActive,
+        hasVideoRef: !!videoRef.current,
+        isAutoScanning,
+        autoScanStarted: autoScanStartedRef.current
+      });
     }
   }, [videoLoaded, isActive, isAutoScanning, startAutoScan, onTimeout]);
 
@@ -171,8 +204,9 @@ const AutoScanCameraPreview = ({
         stopPreview();
       }
       stopAutoScan();
+      autoScanStartedRef.current = false;
     };
-  }, [isActive, stopPreview, stopAutoScan]);
+  }, []); // Only run on mount/unmount, not on isActive changes
 
   // Render permission prompt
   if (permissions.denied || permissions.prompt) {
@@ -272,6 +306,12 @@ const AutoScanCameraPreview = ({
           onLoadedData={() => {
             console.log('Video data loaded');
             setVideoLoaded(true);
+            // Set scanning activity when video is ready
+            setScanningActivity(prev => ({
+              ...prev,
+              isScanning: true,
+              lastActivity: Date.now(),
+            }));
           }}
           onError={(e) => {
             console.error('Video element error:', e);

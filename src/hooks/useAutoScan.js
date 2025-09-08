@@ -36,6 +36,11 @@ export const useAutoScan = () => {
 
   // Local state
   const [isAutoScanning, setIsAutoScanning] = useState(false);
+  
+  // Debug isAutoScanning changes
+  useEffect(() => {
+    console.log('useAutoScan: isAutoScanning changed to:', isAutoScanning);
+  }, [isAutoScanning]);
   const [documentStatus, setDocumentStatus] = useState({
     detected: false,
     positioned: false,
@@ -69,20 +74,23 @@ export const useAutoScan = () => {
    */
   const initialize = useCallback(async () => {
     try {
+      console.log('useAutoScan: Initializing document detection service...');
       const success = await documentDetectionService.initialize();
       if (!success) {
         throw new Error('Failed to initialize document detection service');
       }
 
+      console.log('useAutoScan: Setting up document detection callbacks...');
       // Set up callbacks
       documentDetectionService.onDocumentDetected(handleDocumentDetected);
       documentDetectionService.onDocumentPositioned(handleDocumentPositioned);
       documentDetectionService.onDocumentQualityChanged(handleDocumentQualityChanged);
       documentDetectionService.onAnalysisComplete(handleAnalysisComplete);
 
+      console.log('useAutoScan: Initialization completed successfully');
       return true;
     } catch (error) {
-      console.error('Auto-scan initialization failed:', error);
+      console.error('useAutoScan: Initialization failed:', error);
       setError(error.message);
       return false;
     }
@@ -94,12 +102,18 @@ export const useAutoScan = () => {
    * @param {Function} onTimeout - Callback when timeout occurs
    */
   const startAutoScan = useCallback((videoElement, onTimeout = null) => {
+    console.log('useAutoScan: startAutoScan called', {
+      hasVideoElement: !!videoElement,
+      videoElementReady: videoElement?.readyState >= 2
+    });
+    
     if (!videoElement) {
-      console.error('Video element required for auto-scan');
+      console.error('useAutoScan: Video element required for auto-scan');
       return false;
     }
 
     videoElementRef.current = videoElement;
+    console.log('useAutoScan: Setting isAutoScanning to true');
     setIsAutoScanning(true);
     setScanAttempts(0);
     setTimeoutCallback(() => onTimeout);
@@ -110,27 +124,37 @@ export const useAutoScan = () => {
     }));
 
     // Update scanning activity to prevent idle screen
-    setScanningActivity(prev => ({
-      ...prev,
-      isAutoScanning: true,
-      lastActivity: Date.now(),
-    }));
+    setScanningActivity(prev => {
+      const newActivity = {
+        ...prev,
+        isAutoScanning: true,
+        lastActivity: Date.now(),
+      };
+      console.log('useAutoScan: Setting scanning activity to prevent idle', newActivity);
+      return newActivity;
+    });
 
+    console.log('useAutoScan: Starting document analysis...');
     // Start document analysis
-    documentDetectionService.startAnalysis(videoElement, {
+    const analysisStarted = documentDetectionService.startAnalysis(videoElement, {
       analysisInterval: settings.analysisInterval,
       qualityThreshold: settings.qualityThreshold,
     });
 
+    if (!analysisStarted) {
+      console.error('useAutoScan: Failed to start document analysis');
+      return false;
+    }
+
     // Set up auto-entry timeout
     autoEntryTimeoutRef.current = setTimeout(() => {
-      console.log('Auto-scan timeout reached, defaulting to manual entry');
+      console.log('useAutoScan: Auto-scan timeout reached, defaulting to manual entry');
       if (onTimeout) {
         onTimeout();
       }
     }, settings.autoEntryTimeout);
 
-    console.log('Auto-scan started with 60-second timeout');
+    console.log('useAutoScan: Auto-scan started with 60-second timeout');
     return true;
   }, [settings.analysisInterval, settings.qualityThreshold, settings.autoEntryTimeout]);
 
@@ -138,6 +162,7 @@ export const useAutoScan = () => {
    * Stop auto-scanning
    */
   const stopAutoScan = useCallback(() => {
+    console.log('useAutoScan: stopAutoScan called - setting isAutoScanning to false');
     setIsAutoScanning(false);
     setIsScanning(false);
     documentDetectionService.stopAnalysis();
@@ -165,12 +190,16 @@ export const useAutoScan = () => {
     }));
 
     // Clear scanning activity
-    setScanningActivity(prev => ({
-      ...prev,
-      isAutoScanning: false,
-      isScanning: false,
-      isProcessing: false,
-    }));
+    setScanningActivity(prev => {
+      const newActivity = {
+        ...prev,
+        isAutoScanning: false,
+        isScanning: false,
+        isProcessing: false,
+      };
+      console.log('useAutoScan: Clearing scanning activity', newActivity);
+      return newActivity;
+    });
 
     console.log('Auto-scan stopped');
   }, []);
@@ -202,8 +231,13 @@ export const useAutoScan = () => {
     }));
 
     // Trigger auto-scan if conditions are met
-    if (canTriggerScan()) {
+    const canTrigger = canTriggerScan();
+    console.log('handleDocumentPositioned: canTriggerScan result:', canTrigger);
+    if (canTrigger) {
+      console.log('handleDocumentPositioned: Calling triggerAutoScan...');
       triggerAutoScan();
+    } else {
+      console.log('handleDocumentPositioned: Not triggering auto-scan, conditions not met');
     }
   }, []);
 
@@ -257,11 +291,17 @@ export const useAutoScan = () => {
 
     // Check if we should trigger auto-scan (more aggressive triggering)
     if (analysis.hasDocument && analysis.quality >= 0.3) {
-      if (canTriggerScan()) {
+      const canTrigger = canTriggerScan();
+      console.log('handleAnalysisComplete: canTriggerScan result:', canTrigger);
+      if (canTrigger) {
+        console.log('handleAnalysisComplete: Scheduling triggerAutoScan in 200ms...');
         // Reduce delay for faster response
         analysisTimeoutRef.current = setTimeout(() => {
+          console.log('handleAnalysisComplete: Executing scheduled triggerAutoScan...');
           triggerAutoScan();
         }, 200);
+      } else {
+        console.log('handleAnalysisComplete: Not scheduling auto-scan, conditions not met');
       }
     }
   }, [settings.qualityThreshold]);
@@ -274,19 +314,49 @@ export const useAutoScan = () => {
     const now = Date.now();
     const timeSinceLastScan = now - lastScanTime;
     
-    return (
+    const result = (
       isAutoScanning &&
       !isScanning &&
       timeSinceLastScan >= settings.scanCooldown &&
       scanAttempts < settings.maxScanAttempts
     );
+    
+    console.log('canTriggerScan check', {
+      isAutoScanning,
+      isScanning,
+      timeSinceLastScan,
+      scanCooldown: settings.scanCooldown,
+      scanAttempts,
+      maxScanAttempts: settings.maxScanAttempts,
+      result
+    });
+    
+    // Also log individual conditions for debugging
+    console.log('canTriggerScan conditions:', {
+      'isAutoScanning': isAutoScanning,
+      '!isScanning': !isScanning,
+      'timeSinceLastScan >= scanCooldown': timeSinceLastScan >= settings.scanCooldown,
+      'scanAttempts < maxScanAttempts': scanAttempts < settings.maxScanAttempts
+    });
+    
+    return result;
   }, [isAutoScanning, isScanning, lastScanTime, settings.scanCooldown, settings.maxScanAttempts, scanAttempts]);
 
   /**
    * Trigger automatic scan
    */
   const triggerAutoScan = useCallback(async () => {
+    console.log('triggerAutoScan called', {
+      hasVideoElement: !!videoElementRef.current,
+      isScanning,
+      canTrigger: canTriggerScan()
+    });
+    
     if (!videoElementRef.current || isScanning) {
+      console.log('triggerAutoScan: Early return', {
+        hasVideoElement: !!videoElementRef.current,
+        isScanning
+      });
       return;
     }
 

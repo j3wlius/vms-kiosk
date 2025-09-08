@@ -100,6 +100,13 @@ class DocumentDetectionService {
       if (!videoElement || videoElement.readyState < 2) {
         return;
       }
+      
+      // Log frame analysis every 50 frames to avoid spam
+      if (!this.frameCount) this.frameCount = 0;
+      this.frameCount++;
+      if (this.frameCount % 50 === 0) {
+        console.log('DocumentDetection: Analyzing frame', this.frameCount);
+      }
 
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -127,14 +134,17 @@ class DocumentDetectionService {
       this.notifyAnalysisComplete(analysis);
       
       if (analysis.hasDocument && !this.currentAnalysis?.hasDocument) {
+        console.log('DocumentDetection: Document detected!', analysis);
         this.notifyDocumentDetected(analysis);
       }
       
       if (analysis.isPositioned && analysis.quality >= settings.qualityThreshold) {
+        console.log('DocumentDetection: Document positioned and ready!', analysis);
         this.notifyDocumentPositioned(analysis);
       }
       
       if (this.currentAnalysis?.quality !== analysis.quality) {
+        console.log('DocumentDetection: Quality changed', analysis.quality);
         this.notifyDocumentQualityChanged(analysis);
       }
       
