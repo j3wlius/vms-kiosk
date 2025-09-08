@@ -1,13 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAtomValue } from 'jotai';
+import { scanningActivityAtom } from '../stores/atoms/systemAtoms';
 
 const useIdleDetection = (idleTime = 30000) => {
   const [isIdle, setIsIdle] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const scanningActivity = useAtomValue(scanningActivityAtom);
 
   const resetIdleTimer = useCallback(() => {
     setLastActivity(Date.now());
     setIsIdle(false);
   }, []);
+
+  // Reset idle state when scanning becomes active
+  useEffect(() => {
+    if (scanningActivity.isScanning || scanningActivity.isAutoScanning || scanningActivity.isProcessing) {
+      setIsIdle(false);
+    }
+  }, [scanningActivity.isScanning, scanningActivity.isAutoScanning, scanningActivity.isProcessing]);
 
   useEffect(() => {
     let idleTimer;
@@ -18,7 +28,10 @@ const useIdleDetection = (idleTime = 30000) => {
 
     const startIdleTimer = () => {
       idleTimer = setTimeout(() => {
-        setIsIdle(true);
+        // Don't set idle if scanning is active
+        if (!scanningActivity.isScanning && !scanningActivity.isAutoScanning && !scanningActivity.isProcessing) {
+          setIsIdle(true);
+        }
       }, idleTime);
     };
 
@@ -48,7 +61,7 @@ const useIdleDetection = (idleTime = 30000) => {
         clearTimeout(idleTimer);
       }
     };
-  }, [idleTime, resetIdleTimer]);
+  }, [idleTime, resetIdleTimer, scanningActivity]);
 
   return {
     isIdle,

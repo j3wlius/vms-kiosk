@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useCamera } from '../../hooks/useCamera';
 import AutoScanCameraPreview from '../ui/AutoScanCameraPreview';
@@ -18,6 +18,8 @@ import {
 
 const CheckInScreen = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode') || 'new'; // 'new' or 'registered'
   // const videoRef = useRef(null);
   
   // Atom values
@@ -45,7 +47,11 @@ const CheckInScreen = () => {
   // Local state
   const [isInitialized, setIsInitialized] = useState(false);
   const [scanningStatus, setScanningStatus] = useState('ready'); // 'ready', 'scanning', 'processing', 'success', 'error'
-  const [scanMessage, setScanMessage] = useState('Position your ID document in front of the camera');
+  const [scanMessage, setScanMessage] = useState(
+    mode === 'registered' 
+      ? 'Scan your visitor badge or ID to check in' 
+      : 'Position your ID document in front of the camera'
+  );
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [showCountdown, setShowCountdown] = useState(false);
 
@@ -125,6 +131,11 @@ const CheckInScreen = () => {
     navigate('/verify');
   };
 
+  // Handle back to options
+  const handleBackToOptions = () => {
+    navigate('/checkin-options');
+  };
+
   // Handle retry
   const handleRetry = () => {
     setOcrProcessing(prev => ({ 
@@ -133,7 +144,11 @@ const CheckInScreen = () => {
       error: null 
     }));
     setScanningStatus('ready');
-    setScanMessage('Position your ID document in front of the camera');
+    setScanMessage(
+      mode === 'registered' 
+        ? 'Scan your visitor badge or ID to check in' 
+        : 'Position your ID document in front of the camera'
+    );
     setShowCountdown(false);
     setTimeRemaining(60);
   };
@@ -261,7 +276,7 @@ const CheckInScreen = () => {
       <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-6 sm:p-8">
 
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-6 text-center kiosk-text">
-          Check In
+          {mode === 'registered' ? 'Already Registered - Check In' : 'New Visitor - Check In'}
         </h1>
         
         {/* Auto-Scan Camera Preview */}
@@ -332,7 +347,12 @@ const CheckInScreen = () => {
                     Auto-Scan Ready
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>Position your ID document in front of the camera. The system will automatically detect and scan it when properly positioned.</p>
+                    <p>
+                      {mode === 'registered' 
+                        ? 'Scan your visitor badge or ID document. The system will automatically detect and process it when properly positioned.'
+                        : 'Position your ID document in front of the camera. The system will automatically detect and scan it when properly positioned.'
+                      }
+                    </p>
                     {showCountdown && (
                       <div className="mt-2 flex items-center">
                         <svg className="h-4 w-4 text-orange-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -374,6 +394,13 @@ const CheckInScreen = () => {
 
         {/* Manual Options */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={handleBackToOptions}
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 font-medium"
+          >
+            Back to Options
+          </button>
+          
           {scanningStatus === 'error' && (
             <button
               onClick={handleRetry}

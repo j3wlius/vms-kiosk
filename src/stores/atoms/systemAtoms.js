@@ -54,6 +54,14 @@ export const cameraStatusAtom = atom({
   },
 });
 
+// Scanning activity atom to prevent idle screen during scanning
+export const scanningActivityAtom = atom({
+  isScanning: false,
+  isAutoScanning: false,
+  isProcessing: false,
+  lastActivity: Date.now(),
+});
+
 export const cameraErrorAtom = atom(null);
 
 export const cameraSettingsAtom = atom({

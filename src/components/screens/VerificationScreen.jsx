@@ -269,7 +269,7 @@ const VerificationScreen = () => {
         </div>
 
         {/* Validation Errors */}
-        {!isFormValid && (
+        {/* {!isFormValid && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <h4 className="text-red-800 font-semibold mb-2">Please fix the following errors:</h4>
             <ul className="text-red-700 text-sm space-y-1">
@@ -281,7 +281,7 @@ const VerificationScreen = () => {
               )}
             </ul>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

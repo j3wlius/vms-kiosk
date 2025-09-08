@@ -4,6 +4,7 @@ import { AppProvider } from './stores';
 import MainLayout from './components/common/MainLayout';
 import IdleScreen from './components/screens/IdleScreen';
 import MainMenuScreen from './components/screens/MainMenuScreen';
+import CheckInOptionsScreen from './components/screens/CheckInOptionsScreen';
 import CheckInScreen from './components/screens/CheckInScreen';
 import VerificationScreen from './components/screens/VerificationScreen';
 import ContactInfoScreen from './components/screens/ContactInfoScreen';
@@ -33,6 +34,7 @@ function App() {
         <Routes>
           <Route path="/" element={<MainLayout />}>
             <Route index element={<MainMenuScreen />} />
+            <Route path="checkin-options" element={<CheckInOptionsScreen />} />
             <Route path="checkin" element={<CheckInScreen />} />
             <Route path="verify" element={<VerificationScreen />} />
             <Route path="contact-info" element={<ContactInfoScreen />} />

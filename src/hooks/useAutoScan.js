@@ -11,6 +11,7 @@ import {
   documentTypeAtom,
   extractedFieldsAtom,
 } from '../stores/atoms/visitorAtoms';
+import { scanningActivityAtom } from '../stores/atoms/systemAtoms';
 
 /**
  * useAutoScan Hook
@@ -24,6 +25,7 @@ export const useAutoScan = () => {
   const setConfidence = useSetAtom(ocrConfidenceAtom);
   const setDocumentType = useSetAtom(documentTypeAtom);
   const setExtractedFields = useSetAtom(extractedFieldsAtom);
+  const setScanningActivity = useSetAtom(scanningActivityAtom);
   
   // Atom values
   const results = useAtomValue(ocrResultsAtom);
@@ -107,6 +109,13 @@ export const useAutoScan = () => {
       canScan: false,
     }));
 
+    // Update scanning activity to prevent idle screen
+    setScanningActivity(prev => ({
+      ...prev,
+      isAutoScanning: true,
+      lastActivity: Date.now(),
+    }));
+
     // Start document analysis
     documentDetectionService.startAnalysis(videoElement, {
       analysisInterval: settings.analysisInterval,
@@ -153,6 +162,14 @@ export const useAutoScan = () => {
       ...prev,
       instructions: 'Auto-scan stopped',
       canScan: false,
+    }));
+
+    // Clear scanning activity
+    setScanningActivity(prev => ({
+      ...prev,
+      isAutoScanning: false,
+      isScanning: false,
+      isProcessing: false,
     }));
 
     console.log('Auto-scan stopped');
@@ -307,6 +324,14 @@ export const useAutoScan = () => {
           clearTimeout(autoEntryTimeoutRef.current);
           autoEntryTimeoutRef.current = null;
         }
+        
+        // Clear scanning activity
+        setScanningActivity(prev => ({
+          ...prev,
+          isScanning: false,
+          isProcessing: false,
+        }));
+        
         stopAutoScan();
         
         return ocrResults;
@@ -331,6 +356,13 @@ export const useAutoScan = () => {
     } finally {
       setIsScanning(false);
       setProcessing(false);
+      
+      // Clear scanning activity
+      setScanningActivity(prev => ({
+        ...prev,
+        isScanning: false,
+        isProcessing: false,
+      }));
     }
   }, [isScanning, setProcessing, setResults, setConfidence, setDocumentType, setExtractedFields, setError, stopAutoScan]);
 
@@ -346,6 +378,14 @@ export const useAutoScan = () => {
       setIsScanning(true);
       setProcessing(true);
       setProcessing(prev => ({ ...prev, error: null }));
+
+      // Update scanning activity
+      setScanningActivity(prev => ({
+        ...prev,
+        isScanning: true,
+        isProcessing: true,
+        lastActivity: Date.now(),
+      }));
 
       const imageBlob = await cameraService.captureImage();
       if (!imageBlob) {
@@ -369,6 +409,13 @@ export const useAutoScan = () => {
     } finally {
       setIsScanning(false);
       setProcessing(false);
+      
+      // Clear scanning activity
+      setScanningActivity(prev => ({
+        ...prev,
+        isScanning: false,
+        isProcessing: false,
+      }));
     }
   }, [setProcessing, setResults, setConfidence, setDocumentType, setExtractedFields, setError]);
 
@@ -388,6 +435,14 @@ export const useAutoScan = () => {
       instructions: 'Position your ID document in front of the camera',
       canScan: false,
     });
+    
+    // Clear scanning activity
+    setScanningActivity(prev => ({
+      ...prev,
+      isScanning: false,
+      isAutoScanning: false,
+      isProcessing: false,
+    }));
   }, [stopAutoScan]);
 
   /**
