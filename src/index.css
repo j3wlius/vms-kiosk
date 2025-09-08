@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+/* Custom styles for kiosk app */
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Kiosk-specific styles */
+.kiosk-container {
+  @apply min-h-screen;
+}
+
+/* Touch-friendly button styles */
+.touch-button {
+  @apply min-h-[48px] min-w-[48px] text-lg font-medium;
+}
+
+/* Responsive text scaling */
+@media (max-width: 640px) {
+  .kiosk-text {
+    @apply text-sm;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .kiosk-text {
+    @apply text-base;
+  }
+}
+
+@media (min-width: 1025px) {
+  .kiosk-text {
+    @apply text-lg;
+  }
+}
+
+/* High contrast mode for accessibility */
+@media (prefers-contrast: high) {
+  .kiosk-button {
+    @apply border-2 border-black;
+  }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
