@@ -1,0 +1,22 @@
+Error Details:
+ReferenceError: ErrorRecovery is not defined
+
+    at CheckInScreen (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/components/screens/CheckInScreen.jsx?t=1757313887514:34:20)
+    at RenderedRoute (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:5575:26)
+    at Outlet (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:6270:26)
+    at main (<anonymous>)
+    at div (<anonymous>)
+    at MainLayout (<anonymous>)
+    at RenderedRoute (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:5575:26)
+    at Routes (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:6336:3)
+    at Router (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:6279:13)
+    at BrowserRouter (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/react-router-dom.js?v=dce71b36:9370:3)
+    at VisitorProvider (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/providers/VisitorProvider.jsx:34:35)
+    at SystemProvider (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/providers/SystemProvider.jsx:42:34)
+    at UIProvider (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/providers/UIProvider.jsx:53:30)
+    at Provider (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/node_modules/.vite/deps/jotai.js?v=00446e02:567:3)
+    at ErrorBoundaryClass (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/components/ErrorBoundary.jsx:23:5)
+    at ErrorBoundaryWithHooks (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/components/ErrorBoundary.jsx:193:35)
+    at ErrorBoundary (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/components/ErrorBoundary.jsx:206:26)
+    at AppProvider (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/stores/providers/AppProvider.jsx:24:31)
+    at App (https://62dabf54-3419-4a78-8200-3b31217543a7-00-n31v0i4jl867.picard.replit.dev/src/App.jsx:37:38)

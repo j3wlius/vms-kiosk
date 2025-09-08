@@ -5,6 +5,7 @@ import { useCamera } from '../../hooks/useCamera';
 import AutoScanCameraPreview from '../ui/AutoScanCameraPreview';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import ToastNotifications from '../ui/ToastNotifications';
+import ErrorRecovery from '../ui/ErrorRecovery';
 import {
   formDataAtom,
   ocrProcessingAtom,
