@@ -366,19 +366,6 @@ const AutoScanCameraPreview = ({
           </div>
         )}
 
-        {/* Manual scan button */}
-        {canScan && !isScanning && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-            <Button
-              onClick={handleManualScan}
-              variant="primary"
-              size="lg"
-              className="shadow-lg"
-            >
-              Scan Now
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Instructions */}
