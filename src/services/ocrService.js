@@ -77,28 +77,42 @@ class OCRService {
         return true;
       }
 
-      console.log('Initializing OCR worker...');
-      this.worker = await Tesseract.createWorker({
-        logger: m => {
-          console.log('OCR Worker:', m);
-          if (m.status === 'recognizing text') {
-            this.onProgress?.(m.progress);
-          }
-        },
+      // Add timeout for initialization
+      const initPromise = this._initializeWorker();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('OCR initialization timeout')), 30000);
       });
 
-      console.log('Loading OCR language...');
-      await this.worker.loadLanguage(this.settings.language);
-      await this.worker.initialize(this.settings.language);
-
+      await Promise.race([initPromise, timeoutPromise]);
+      
       this.isInitialized = true;
       console.log('OCR worker initialized successfully');
       return true;
     } catch (error) {
       console.error('OCR initialization failed:', error);
       this.isInitialized = false;
-      throw new Error('Failed to initialize OCR service');
+      // Don't throw, allow fallback to continue
+      return false;
     }
+  }
+
+  /**
+   * Internal worker initialization
+   */
+  async _initializeWorker() {
+    console.log('Initializing OCR worker...');
+    this.worker = await Tesseract.createWorker({
+      logger: m => {
+        console.log('OCR Worker:', m);
+        if (m.status === 'recognizing text') {
+          this.onProgress?.(m.progress);
+        }
+      },
+    });
+
+    console.log('Loading OCR language...');
+    await this.worker.loadLanguage(this.settings.language);
+    await this.worker.initialize(this.settings.language);
   }
 
   /**

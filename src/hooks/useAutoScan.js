@@ -255,13 +255,13 @@ export const useAutoScan = () => {
       position: analysis.position,
     }));
 
-    // Check if we should trigger auto-scan (more lenient conditions)
-    if (analysis.hasDocument && analysis.quality >= settings.qualityThreshold) {
+    // Check if we should trigger auto-scan (more aggressive triggering)
+    if (analysis.hasDocument && analysis.quality >= 0.3) {
       if (canTriggerScan()) {
-        // Add a small delay to ensure stable positioning
+        // Reduce delay for faster response
         analysisTimeoutRef.current = setTimeout(() => {
           triggerAutoScan();
-        }, 500);
+        }, 200);
       }
     }
   }, [settings.qualityThreshold]);
@@ -291,6 +291,7 @@ export const useAutoScan = () => {
     }
 
     try {
+      console.log('Triggering automatic scan...');
       setIsScanning(true);
       setScanAttempts(prev => prev + 1);
       setLastScanTime(Date.now());
@@ -301,14 +302,17 @@ export const useAutoScan = () => {
         throw new Error('Failed to capture image');
       }
 
+      console.log('Image captured successfully, processing with OCR...');
+
       // Process with OCR
       setProcessing(true);
-      setProcessing(prev => ({ ...prev, error: null }));
+      setError(null);
 
       const ocrResults = await ocrService.processImage(imageBlob);
+      console.log('OCR processing completed:', ocrResults);
 
-      if (ocrResults && ocrResults.confidence > 0.5) {
-        // Successful scan
+      if (ocrResults && ocrResults.confidence > 0.3) {
+        // Successful scan (lowered threshold for demo)
         setResults(ocrResults);
         setConfidence(ocrResults.confidence);
         setDocumentType(ocrResults.documentType);
@@ -318,6 +322,8 @@ export const useAutoScan = () => {
           ...prev,
           instructions: `Document scanned successfully! Confidence: ${Math.round(ocrResults.confidence * 100)}%`,
         }));
+
+        console.log('Auto-scan completed successfully!');
 
         // Clear timeout and stop auto-scanning after successful scan
         if (autoEntryTimeoutRef.current) {
@@ -336,27 +342,40 @@ export const useAutoScan = () => {
         
         return ocrResults;
       } else {
-        // Low confidence - continue scanning
-        const confidence = ocrResults ? Math.round(ocrResults.confidence * 100) : 0;
+        // Low confidence scan, but continue trying
+        console.log('Low confidence scan result, continuing auto-scan...');
         setDocumentStatus(prev => ({
           ...prev,
-          instructions: `Scan quality low (${confidence}%). Please hold document steady and ensure good lighting`,
+          instructions: 'Document detected but quality could be better. Adjusting...',
         }));
-
-        // Reset scan cooldown for retry
-        setLastScanTime(0);
       }
+
+      setProcessing(false);
     } catch (error) {
       console.error('Auto-scan failed:', error);
-      setError(error.message);
-      setDocumentStatus(prev => ({
-        ...prev,
-        instructions: 'Scan failed. Please try again',
-      }));
-    } finally {
       setIsScanning(false);
       setProcessing(false);
+      setError(error.message || 'Auto-scan failed');
       
+      // Don't give up immediately, try again if we have attempts left
+      if (scanAttempts < settings.maxScanAttempts) {
+        setDocumentStatus(prev => ({
+          ...prev,
+          instructions: 'Scan attempt failed, repositioning and trying again...',
+        }));
+        
+        // Retry after a short delay
+        setTimeout(() => {
+          setIsScanning(false);
+          setError(null);
+        }, 1000);
+      } else {
+        setDocumentStatus(prev => ({
+          ...prev,
+          instructions: 'Auto-scan failed after multiple attempts. Please use manual scan.',
+        }));
+      }
+    } finally {
       // Clear scanning activity
       setScanningActivity(prev => ({
         ...prev,
@@ -364,7 +383,7 @@ export const useAutoScan = () => {
         isProcessing: false,
       }));
     }
-  }, [isScanning, setProcessing, setResults, setConfidence, setDocumentType, setExtractedFields, setError, stopAutoScan]);
+  }, [scanAttempts, settings.maxScanAttempts, isScanning, setProcessing, setResults, setConfidence, setDocumentType, setExtractedFields, setError, stopAutoScan]);
 
   /**
    * Manually trigger scan (fallback)
