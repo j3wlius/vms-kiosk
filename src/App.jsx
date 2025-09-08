@@ -10,6 +10,7 @@ import ContactInfoScreen from './components/screens/ContactInfoScreen';
 import VisitDetailsScreen from './components/screens/VisitDetailsScreen';
 import BadgePrintScreen from './components/screens/BadgePrintScreen';
 import CheckOutScreen from './components/screens/CheckOutScreen';
+import CameraTest from './components/CameraTest';
 import ToastNotifications from './components/ui/ToastNotifications';
 import OfflineIndicator from './components/ui/OfflineIndicator';
 import useIdleDetection from './hooks/useIdleDetection';
@@ -38,6 +39,7 @@ function App() {
             <Route path="visit-details" element={<VisitDetailsScreen />} />
             <Route path="print" element={<BadgePrintScreen />} />
             <Route path="checkout" element={<CheckOutScreen />} />
+            <Route path="camera-test" element={<CameraTest />} />
           </Route>
         </Routes>
         {/* Global Toast Notifications */}

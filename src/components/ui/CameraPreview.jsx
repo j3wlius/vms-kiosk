@@ -20,6 +20,7 @@ const CameraPreview = ({
   const canvasRef = useRef(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState(null);
+  const [videoLoaded, setVideoLoaded] = useState(false);
   
   // Camera hook
   const {
@@ -83,20 +84,30 @@ const CameraPreview = ({
   // Start preview when initialized
   useEffect(() => {
     if (isInitialized && !isActive && videoRef.current && autoStart) {
-      handleStartPreview();
+      // Add a small delay to ensure video element is ready
+      const timer = setTimeout(() => {
+        handleStartPreview();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isInitialized, isActive, autoStart]);
 
   // Handle starting preview
   const handleStartPreview = useCallback(async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current) {
+      console.error('Video element not available');
+      return;
+    }
     
     try {
+      console.log('Starting camera preview...');
       const success = await startPreview(videoRef.current);
       if (!success) {
         throw new Error('Failed to start camera preview');
       }
+      console.log('Camera preview started successfully');
     } catch (err) {
+      console.error('Camera preview error:', err);
       const errorMessage = err.message || 'Failed to start camera preview';
       setError(errorMessage);
       onError?.(errorMessage);
@@ -236,11 +247,30 @@ const CameraPreview = ({
           autoPlay
           playsInline
           muted
-          className="w-full h-auto bg-gray-900"
+          className="w-full h-full object-cover bg-gray-100"
           style={{
             transform: 'scaleX(-1)', // Mirror the video
+            minHeight: '200px',
+          }}
+          onLoadedData={() => {
+            console.log('Video data loaded');
+            setVideoLoaded(true);
+          }}
+          onError={(e) => {
+            console.error('Video element error:', e);
+            setError('Video failed to load');
           }}
         />
+        
+        {/* Loading overlay */}
+        {!videoLoaded && isActive && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <LoadingSpinner size="md" />
+              <p className="text-sm text-gray-600 mt-2">Loading camera...</p>
+            </div>
+          </div>
+        )}
         
         {/* Canvas for capture (hidden) */}
         <canvas

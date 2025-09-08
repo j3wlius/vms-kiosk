@@ -12,6 +12,10 @@ const MainMenuScreen = () => {
     navigate('/checkout');
   };
 
+  const handleCameraTest = () => {
+    navigate('/camera-test');
+  };
+
 
   return (
     <div className="kiosk-container flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -49,6 +53,17 @@ const MainMenuScreen = () => {
                   <div>Check Out</div>
                   <div className="text-sm opacity-90">End your visit</div>
                 </div>
+              </div>
+            </button>
+            
+            {/* Camera Test Button (for debugging) */}
+            <button
+              onClick={handleCameraTest}
+              className="w-full bg-gray-600 text-white py-3 px-8 rounded-lg hover:bg-gray-700 transition-colors touch-button kiosk-button text-sm font-medium"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span className="text-lg">🔧</span>
+                <div>Camera Test (Debug)</div>
               </div>
             </button>
           </div>

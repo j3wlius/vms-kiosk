@@ -152,18 +152,25 @@ class CameraService {
    */
   async getDevices() {
     try {
+      console.log('Enumerating camera devices...');
       const devices = await navigator.mediaDevices.enumerateDevices();
-      this.devices = devices
-        .filter(device => device.kind === 'videoinput')
-        .map(device => ({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${device.deviceId.slice(0, 8)}`,
-          groupId: device.groupId,
-        }));
+      console.log('All devices:', devices);
+      
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      console.log('Video devices found:', videoDevices);
+      
+      this.devices = videoDevices.map(device => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${device.deviceId.slice(0, 8)}`,
+        groupId: device.groupId,
+      }));
+
+      console.log('Processed devices:', this.devices);
 
       // Select first device if none selected
       if (!this.selectedDevice && this.devices.length > 0) {
         this.selectedDevice = this.devices[0].deviceId;
+        console.log('Selected device:', this.selectedDevice);
       }
 
       return this.devices;
@@ -191,20 +198,52 @@ class CameraService {
       // Try to get stream with constraints
       let stream;
       try {
+        console.log('Attempting to get media stream with constraints:', constraints);
         stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Successfully got media stream');
       } catch (error) {
-        // If constraints fail, try with minimal constraints
-        if (error.name === 'OverconstrainedError' || error.name === 'NotFoundError') {
-          console.log('Trying with minimal constraints...');
-          constraints = {
+        console.log('First attempt failed:', error.name, error.message);
+        
+        // Try different constraint combinations for DroidCam compatibility
+        const fallbackConstraints = [
+          // Try without device ID
+          {
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+            },
+          },
+          // Try with minimal constraints
+          {
             video: {
               width: { min: 320, ideal: 640 },
               height: { min: 240, ideal: 480 },
             },
-          };
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } else {
-          throw error;
+          },
+          // Try with just basic video
+          {
+            video: true,
+          },
+          // Try with specific device but no other constraints
+          this.selectedDevice ? {
+            video: {
+              deviceId: { exact: this.selectedDevice },
+            },
+          } : null,
+        ].filter(Boolean);
+
+        for (let i = 0; i < fallbackConstraints.length; i++) {
+          try {
+            console.log(`Trying fallback constraint ${i + 1}:`, fallbackConstraints[i]);
+            stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints[i]);
+            console.log(`Success with fallback constraint ${i + 1}`);
+            break;
+          } catch (fallbackError) {
+            console.log(`Fallback ${i + 1} failed:`, fallbackError.name, fallbackError.message);
+            if (i === fallbackConstraints.length - 1) {
+              throw error; // Throw original error if all fallbacks fail
+            }
+          }
         }
       }
 
@@ -215,10 +254,25 @@ class CameraService {
 
       // Wait for video to load
       await new Promise((resolve, reject) => {
-        this.videoElement.onloadedmetadata = resolve;
-        this.videoElement.onerror = reject;
-        // Timeout after 10 seconds
-        setTimeout(() => reject(new Error('Video load timeout')), 10000);
+        const timeout = setTimeout(() => reject(new Error('Video load timeout')), 10000);
+        
+        this.videoElement.onloadedmetadata = () => {
+          clearTimeout(timeout);
+          // Force play the video
+          this.videoElement.play().then(() => {
+            resolve();
+          }).catch(reject);
+        };
+        
+        this.videoElement.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(new Error('Video element error: ' + error.message));
+        };
+        
+        this.videoElement.oncanplay = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
       });
 
       this.isActive = true;
@@ -389,6 +443,7 @@ class CameraService {
       constraints.video.facingMode = options.facingMode;
     }
 
+    console.log('Built constraints:', constraints);
     return constraints;
   }
 
