@@ -25,6 +25,8 @@ class CameraService {
       onPermissionChange: null,
       onError: null,
     };
+    this.deviceChangeListener = null;
+    this.enumerationTimeout = null;
   }
 
   /**
@@ -41,15 +43,7 @@ class CameraService {
         throw new Error('Camera not supported in this browser');
       }
 
-      // Request permissions
-      await this.requestPermissions();
-
-      // Get available devices
-      await this.getDevices();
-
-      // Setup device change listener
-      this.setupDeviceChangeListener();
-
+      console.log('Camera service initialized successfully');
       return true;
     } catch (error) {
       this.handleError('Camera initialization failed', error);
@@ -451,10 +445,28 @@ class CameraService {
    * Setup device change listener
    */
   setupDeviceChangeListener() {
-    navigator.mediaDevices.addEventListener('devicechange', async () => {
-      await this.getDevices();
-      this.notifyDeviceChange();
-    });
+    // Only set up listener once
+    if (this.deviceChangeListener) {
+      return;
+    }
+    
+    this.deviceChangeListener = async () => {
+      console.log('Device change detected, scheduling re-enumeration...');
+      
+      // Clear existing timeout
+      if (this.enumerationTimeout) {
+        clearTimeout(this.enumerationTimeout);
+      }
+      
+      // Debounce device enumeration
+      this.enumerationTimeout = setTimeout(async () => {
+        console.log('Re-enumerating devices after change...');
+        await this.getDevices();
+        this.notifyDeviceChange();
+      }, 500); // Wait 500ms before re-enumerating
+    };
+    
+    navigator.mediaDevices.addEventListener('devicechange', this.deviceChangeListener);
   }
 
   /**
@@ -567,6 +579,18 @@ class CameraService {
       denied: false,
       prompt: false,
     };
+    
+    // Remove device change listener
+    if (this.deviceChangeListener) {
+      navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
+      this.deviceChangeListener = null;
+    }
+    
+    // Clear enumeration timeout
+    if (this.enumerationTimeout) {
+      clearTimeout(this.enumerationTimeout);
+      this.enumerationTimeout = null;
+    }
   }
 
   /**

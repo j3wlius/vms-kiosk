@@ -77,21 +77,26 @@ class OCRService {
         return true;
       }
 
+      console.log('Initializing OCR worker...');
       this.worker = await Tesseract.createWorker({
         logger: m => {
+          console.log('OCR Worker:', m);
           if (m.status === 'recognizing text') {
             this.onProgress?.(m.progress);
           }
         },
       });
 
+      console.log('Loading OCR language...');
       await this.worker.loadLanguage(this.settings.language);
       await this.worker.initialize(this.settings.language);
 
       this.isInitialized = true;
+      console.log('OCR worker initialized successfully');
       return true;
     } catch (error) {
       console.error('OCR initialization failed:', error);
+      this.isInitialized = false;
       throw new Error('Failed to initialize OCR service');
     }
   }
@@ -105,6 +110,7 @@ class OCRService {
   async processImage(imageData, options = {}) {
     try {
       if (!this.isInitialized) {
+        console.log('OCR not initialized, initializing now...');
         await this.initialize();
       }
 
@@ -112,10 +118,16 @@ class OCRService {
         throw new Error('OCR is already processing an image');
       }
 
+      if (!imageData) {
+        throw new Error('No image data provided');
+      }
+
+      console.log('Starting OCR processing...');
       this.isProcessing = true;
       this.onProgress?.(0);
 
       // Preprocess image
+      console.log('Preprocessing image...');
       const processedImage = await this.preprocessImage(
         imageData,
         options.preprocessing
@@ -123,8 +135,15 @@ class OCRService {
       this.onProgress?.(0.3);
 
       // Perform OCR
+      console.log('Performing OCR recognition...');
       const { data } = await this.worker.recognize(processedImage);
       this.onProgress?.(0.7);
+
+      if (!data || !data.text) {
+        throw new Error('OCR failed to extract text from image');
+      }
+
+      console.log('OCR text extracted:', data.text.substring(0, 100) + '...');
 
       // Extract fields based on document type
       const documentType = this.detectDocumentType(data.text);
@@ -134,6 +153,7 @@ class OCRService {
       // Calculate confidence
       const confidence = this.calculateConfidence(data, fields);
 
+      console.log('OCR processing completed. Confidence:', confidence);
       this.onProgress?.(1);
       this.isProcessing = false;
 
@@ -148,7 +168,7 @@ class OCRService {
     } catch (error) {
       this.isProcessing = false;
       console.error('OCR processing failed:', error);
-      throw new Error('Failed to process image with OCR');
+      throw new Error(`Failed to process image with OCR: ${error.message}`);
     }
   }
 
@@ -259,24 +279,41 @@ class OCRService {
    * @returns {object} Extracted fields
    */
   extractFields(text, documentType) {
-    const patterns =
-      this.fieldPatterns[documentType] || this.fieldPatterns.drivers_license;
-    const fields = {};
-
-    for (const [fieldName, pattern] of Object.entries(patterns)) {
-      const match = text.match(pattern);
-      if (match) {
-        fields[fieldName] = this.cleanFieldValue(match[1]);
-      }
+    if (!text || typeof text !== 'string') {
+      console.warn('Invalid text provided to extractFields:', text);
+      return {};
     }
 
-    // Try to extract full name if individual names not found
-    if (!fields.firstName && !fields.lastName && fields.fullName) {
-      const nameParts = fields.fullName.split(/\s+/);
-      if (nameParts.length >= 2) {
-        fields.firstName = nameParts[0];
-        fields.lastName = nameParts.slice(1).join(' ');
+    const patterns =
+      this.fieldPatterns[documentType] || this.fieldPatterns.drivers_license;
+    
+    if (!patterns || typeof patterns !== 'object') {
+      console.warn('Invalid patterns for document type:', documentType);
+      return {};
+    }
+
+    const fields = {};
+
+    try {
+      for (const [fieldName, pattern] of Object.entries(patterns)) {
+        if (pattern && typeof pattern.test === 'function') {
+          const match = text.match(pattern);
+          if (match && match[1]) {
+            fields[fieldName] = this.cleanFieldValue(match[1]);
+          }
+        }
       }
+
+      // Try to extract full name if individual names not found
+      if (!fields.firstName && !fields.lastName && fields.fullName) {
+        const nameParts = fields.fullName.split(/\s+/);
+        if (nameParts.length >= 2) {
+          fields.firstName = nameParts[0];
+          fields.lastName = nameParts.slice(1).join(' ');
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting fields:', error);
     }
 
     return fields;

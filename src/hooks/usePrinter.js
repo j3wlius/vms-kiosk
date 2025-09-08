@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSetAtom, useAtomValue } from 'jotai';
-import { printingService } from '../services';
+import printingService from '../services/printingService';
 import {
   printerStatusAtom,
   printerErrorAtom,

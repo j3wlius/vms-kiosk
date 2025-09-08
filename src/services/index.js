@@ -4,6 +4,7 @@ export { default as apiService } from './apiService';
 export { default as cameraService } from './cameraService';
 export { default as ocrService } from './ocrService';
 export { default as printingService } from './printingService';
+export { default as documentDetectionService } from './documentDetectionService';
 
 // Service configuration
 export const serviceConfig = {

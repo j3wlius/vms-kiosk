@@ -35,7 +35,6 @@ const MainMenuScreen = () => {
               className="w-full bg-blue-600 text-white py-4 sm:py-6 px-8 rounded-lg hover:bg-blue-700 transition-colors touch-button kiosk-button text-lg sm:text-xl font-medium"
             >
               <div className="flex items-center justify-center space-x-3">
-                <span className="text-2xl">📷</span>
                 <div className="text-left">
                   <div>Check In</div>
                   <div className="text-sm opacity-90">New visitor registration</div>
@@ -48,7 +47,6 @@ const MainMenuScreen = () => {
               className="w-full bg-green-600 text-white py-4 sm:py-6 px-8 rounded-lg hover:bg-green-700 transition-colors touch-button kiosk-button text-lg sm:text-xl font-medium"
             >
               <div className="flex items-center justify-center space-x-3">
-                <span className="text-2xl">📤</span>
                 <div className="text-left">
                   <div>Check Out</div>
                   <div className="text-sm opacity-90">End your visit</div>

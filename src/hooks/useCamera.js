@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSetAtom, useAtomValue } from 'jotai';
-import { cameraService } from '../services';
+import cameraService from '../services/cameraService';
 import {
   cameraStatusAtom,
   availableDevicesAtom,
@@ -47,10 +47,6 @@ export const useCamera = () => {
         setIsInitialized(true);
         setCameraStatus(prev => ({ ...prev, isActive: false }));
 
-        // Get initial devices
-        const devices = await cameraService.getDevices();
-        setAvailableDevices(prev => ({ ...prev, cameras: devices }));
-
         // Set up callbacks
         cameraService.onDeviceChange((devices, selectedDevice) => {
           setAvailableDevices(prev => ({ ...prev, cameras: devices }));
@@ -94,6 +90,16 @@ export const useCamera = () => {
         setCameraStatus(prev => ({ ...prev, isActive: true }));
         setCameraStatus(prev => ({ ...prev, lastError: null }));
 
+        // Request permissions first
+        const permissionSuccess = await cameraService.requestPermissions();
+        if (!permissionSuccess) {
+          throw new Error('Camera permissions not granted');
+        }
+
+        // Get available devices
+        const devices = await cameraService.getDevices();
+        setAvailableDevices(prev => ({ ...prev, cameras: devices }));
+
         videoElementRef.current = videoElement;
         const success = await cameraService.startPreview(videoElement, options);
 
@@ -130,6 +136,7 @@ export const useCamera = () => {
       initialize,
       setCameraStatus,
       setCameraSettings,
+      setAvailableDevices,
     ]
   );
 

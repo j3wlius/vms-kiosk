@@ -1,14 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useCamera, useCameraCapture } from '../../hooks/useCamera';
-import { useOCR } from '../../hooks/useOCR';
-import CameraPreview from '../ui/CameraPreview';
+import { useCamera } from '../../hooks/useCamera';
+import AutoScanCameraPreview from '../ui/AutoScanCameraPreview';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import FlowNavigation from '../ui/FlowNavigation';
-// import StatusIndicator from '../ui/StatusIndicator';
-import ErrorRecovery from '../ui/ErrorRecovery';
-import InstructionCard from '../ui/InstructionCard';
 import ToastNotifications from '../ui/ToastNotifications';
 import {
   formDataAtom,
@@ -46,14 +41,13 @@ const CheckInScreen = () => {
     requestPermissions,
   } = useCamera();
   
-  const { captureWithRetry, isCapturing } = useCameraCapture();
-  const { processImage, isProcessing: isOcrProcessing } = useOCR();
 
   // Local state
   const [isInitialized, setIsInitialized] = useState(false);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [scanAttempts, setScanAttempts] = useState(0);
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [scanningStatus, setScanningStatus] = useState('ready'); // 'ready', 'scanning', 'processing', 'success', 'error'
+  const [scanMessage, setScanMessage] = useState('Position your ID document in front of the camera');
+  const [timeRemaining, setTimeRemaining] = useState(60);
+  const [showCountdown, setShowCountdown] = useState(false);
 
 
   // Camera initialization
@@ -82,44 +76,42 @@ const CheckInScreen = () => {
     }
   };
 
-  // Handle document scan
-  const handleScanDocument = async () => {
-    if (!isCameraActive) {
-      // setCameraError('Camera not active');
-      return;
-    }
-
+  // Handle auto-scan completion
+  const handleScanComplete = async (ocrResults) => {
     try {
-      setScanAttempts(prev => prev + 1);
-      setOcrProcessing(prev => ({ ...prev, isProcessing: true, error: null }));
-      
-      // Capture image
-      const imageData = await captureWithRetry();
-      if (imageData) {
-        setCapturedImage(imageData);
+      if (ocrResults && ocrResults.confidence > 0.7) {
+        setScanningStatus('success');
+        setScanMessage(`Document recognized! Confidence: ${Math.round(ocrResults.confidence * 100)}%`);
+        setShowCountdown(false); // Stop countdown on successful scan
         
-        // Process with OCR
-        const ocrResults = await processImage(imageData.blob);
+        // Update form data with OCR results
+        setFormData(prev => ({
+          ...prev,
+          idDocument: {
+            ...prev.idDocument,
+            ...ocrResults.fields,
+            documentType: ocrResults.documentType,
+          },
+        }));
         
-        if (ocrResults && ocrResults.confidence > 0.7) {
-          // Update form data with OCR results
-          setFormData(prev => ({
-            ...prev,
-            idDocument: {
-              ...prev.idDocument,
-              rawData: imageData,
-              ...ocrResults.extractedData,
-            },
-          }));
-          
-          // Navigate to verification screen
+        // Navigate to verification screen after a brief success message
+        setTimeout(() => {
           navigate('/verify');
-        } else {
-          throw new Error('Document recognition failed. Please try again or enter manually.');
-        }
+        }, 1500);
+      } else {
+        const confidence = ocrResults ? Math.round(ocrResults.confidence * 100) : 0;
+        setScanningStatus('error');
+        setScanMessage(`Document recognition failed (${confidence}% confidence). Please ensure the ID is clearly visible and try again.`);
+        setOcrProcessing(prev => ({ 
+          ...prev, 
+          isProcessing: false, 
+          error: 'Low confidence OCR result' 
+        }));
       }
     } catch (error) {
-      console.error('Document scan failed:', error);
+      console.error('Scan completion failed:', error);
+      setScanningStatus('error');
+      setScanMessage(`Scan failed: ${error.message}`);
       setOcrProcessing(prev => ({ 
         ...prev, 
         isProcessing: false, 
@@ -140,21 +132,70 @@ const CheckInScreen = () => {
       isProcessing: false, 
       error: null 
     }));
-    setCapturedImage(null);
-    // setCameraError(null);
-  };
-
-  // Handle camera capture
-  const handleCameraCapture = (imageData) => {
-    setCapturedImage(imageData);
-    // Auto-process the captured image
-    handleScanDocument();
+    setScanningStatus('ready');
+    setScanMessage('Position your ID document in front of the camera');
+    setShowCountdown(false);
+    setTimeRemaining(60);
   };
 
   // Handle camera error
   const handleCameraError = (error) => {
-    // setCameraError(error);
+    setScanningStatus('error');
+    setScanMessage(`Camera error: ${error}`);
+    setOcrProcessing(prev => ({ 
+      ...prev, 
+      isProcessing: false, 
+      error: error 
+    }));
   };
+
+  // Handle auto-scan timeout
+  const handleAutoScanTimeout = () => {
+    setScanningStatus('timeout');
+    setScanMessage('Auto-scan timed out. Redirecting to manual entry...');
+    setShowCountdown(false);
+    
+    // Navigate to manual entry after a brief delay
+    setTimeout(() => {
+      navigate('/verify');
+    }, 2000);
+  };
+
+  // Start countdown when auto-scan begins
+  useEffect(() => {
+    if (scanningStatus === 'ready' && !showCountdown) {
+      // Start countdown after a 5-second delay to give users time to position document
+      const startCountdownTimer = setTimeout(() => {
+        setShowCountdown(true);
+        setTimeRemaining(55); // 55 seconds remaining after 5-second delay
+      }, 5000);
+
+      return () => clearTimeout(startCountdownTimer);
+    }
+  }, [scanningStatus, showCountdown]);
+
+  // Countdown effect
+  useEffect(() => {
+    let countdownInterval;
+    
+    if (showCountdown && timeRemaining > 0) {
+      countdownInterval = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            setShowCountdown(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+    };
+  }, [showCountdown, timeRemaining]);
 
   // Show loading state
   if (!isInitialized) {
@@ -223,67 +264,132 @@ const CheckInScreen = () => {
           Check In
         </h1>
         
-        {/* Camera Preview */}
+        {/* Auto-Scan Camera Preview */}
         <div className="mb-6">
-          <CameraPreview
-            onCapture={handleCameraCapture}
+          <AutoScanCameraPreview
+            onScanComplete={handleScanComplete}
             onError={handleCameraError}
+            onTimeout={handleAutoScanTimeout}
             className="w-full max-w-xs sm:max-w-sm h-48 sm:h-56 mx-auto rounded-lg overflow-hidden"
-            showControls={false}
             autoStart={true}
+            showInstructions={true}
+            showQualityIndicator={true}
           />
         </div>
 
-        {/* Instructions */}
-        {showInstructions && (
-          <div className="mb-6">
-            <InstructionCard
-              title="How to scan your ID document"
-              icon="📷"
-              steps={[
-                "Place your ID document flat in front of the camera",
-                "Ensure good lighting and avoid shadows",
-                "Keep the document centered and fully visible",
-                "Avoid glare from overhead lights or windows",
-                "Wait for the green frame to appear before scanning"
-              ]}
-              variant="default"
-            />
-          </div>
-        )}
+        {/* Scanning Status Display */}
+        <div className="mb-6">
+          {scanningStatus === 'success' && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">
+                    Document Scanned Successfully!
+                  </h3>
+                  <div className="mt-2 text-sm text-green-700">
+                    <p>{scanMessage}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
+          {scanningStatus === 'error' && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Scan Failed
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{scanMessage}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {/* Action Buttons */}
-        <FlowNavigation
-          onNext={handleScanDocument}
-          onPrevious={() => navigate('/')}
-          nextLabel={isCapturing ? 'Capturing...' : 
-                     isOcrProcessing ? 'Processing...' : 
-                     'Scan ID Document'}
-          previousLabel="Back to Main Menu"
-          nextDisabled={!isCameraActive || isCapturing || isOcrProcessing}
-          nextLoading={isCapturing || isOcrProcessing}
-          showPrevious={true}
-          className="mt-8"
-        />
-        
-        <div className="text-center mt-4">
-          <button
-            onClick={handleManualEntry}
-            className="text-blue-600 hover:text-blue-800 underline kiosk-text"
-          >
-            Enter information manually instead
-          </button>
+          {scanningStatus === 'ready' && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Auto-Scan Ready
+                  </h3>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <p>Position your ID document in front of the camera. The system will automatically detect and scan it when properly positioned.</p>
+                    {showCountdown && (
+                      <div className="mt-2 flex items-center">
+                        <svg className="h-4 w-4 text-orange-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-medium text-orange-700">
+                          Auto-entry in {timeRemaining} seconds
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {scanningStatus === 'timeout' && (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-orange-800">
+                    Auto-Scan Timeout
+                  </h3>
+                  <div className="mt-2 text-sm text-orange-700">
+                    <p>{scanMessage}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Scan Attempts Counter */}
-        {scanAttempts > 0 && (
-          <div className="text-center mt-4">
-            <p className="text-sm text-gray-500">
-              Scan attempts: {scanAttempts}
-            </p>
-          </div>
-        )}
+        
+
+        {/* Manual Options */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {scanningStatus === 'error' && (
+            <button
+              onClick={handleRetry}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+            >
+              Try Again
+            </button>
+          )}
+          
+          <button
+            onClick={handleManualEntry}
+            className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 font-medium"
+          >
+            Manual Entry
+          </button>
+        </div>
       </div>
 
       {/* Toast Notifications */}

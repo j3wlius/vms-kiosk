@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSetAtom, useAtomValue } from 'jotai';
-import { apiService, storageService } from '../services';
+import apiService from '../services/apiService';
+import storageService from '../services/storageService';
 import {
   currentVisitorAtom,
   visitorFormDataAtom,

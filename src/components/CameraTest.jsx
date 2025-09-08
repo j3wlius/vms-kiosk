@@ -33,6 +33,7 @@ const CameraTest = () => {
       const success = await initialize();
       if (success) {
         addLog('Camera initialized successfully');
+        addLog('Camera service is ready for use');
       } else {
         addLog('Camera initialization failed');
       }

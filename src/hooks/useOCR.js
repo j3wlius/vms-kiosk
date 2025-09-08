@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSetAtom, useAtomValue } from 'jotai';
-import { ocrService } from '../services';
+import ocrService from '../services/ocrService';
 import {
   ocrProcessingAtom,
   ocrResultsAtom,
